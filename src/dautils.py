@@ -27,7 +27,7 @@ def plt_setting():
     plt.rc('pdf', fonttype=42)
     plt.rc('ps', fonttype=42)
 
-def argmax(values, f):
+def argmax(values, f=lambda x: x):
     """ Argmax function 
     
     Parameters:
@@ -158,7 +158,7 @@ class Encode:
             for col in cols & self.nominal:
                 dummies = pd.get_dummies(df[col], prefix=col, prefix_sep=self.prefix_sep)
                 res = pd.concat([res, dummies], axis=1)
-            res = self.encoded_atts(df.columns)
+            res = res[self.encoded_atts(df.columns)]
         else:
             res = res[df.columns]
         return res
