@@ -63,6 +63,19 @@ def getReader(filename, encoding='utf8'):
         file = reader(file)
     return file  
 
+def getContents(filename, n=None):
+    """ get  lines from a text file or whole contents """
+    with getReader(filename) as f:
+        if n is None:
+            return f.read()
+        res = ''
+        i = 0
+        for line in f:
+            if i>=n:
+                break
+            i += 1
+            res += line
+
 def getCSVattributes(freader, sep=','):
     """ Return the list of attributes in the header of a CSV or ARFF file reader """
     result = []
