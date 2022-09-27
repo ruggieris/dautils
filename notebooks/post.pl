@@ -1,46 +1,53 @@
-exp2conAll([], _, _, []).
-exp2conAll([E|Es], XF, XCF, [O|Os]) :-
-	exp2con(E, XF, XCF, O),
-	exp2conAll(Es, XF, XCF, Os).
-
-exp2con(N*X, XF, XCF, N*VX) :- !,
-	number(N), exp2con(X, XF, XCF, VX).
-
-exp2con(X*N, XF, XCF, N*VX) :- !,
-	number(N), exp2con(X, XF, XCF, VX).
-
-exp2con(X+Y, XF, XCF, VX+VY) :- !,
-	exp2con(X, XF, XCF, VX), exp2con(Y, XF, XCF, VY).
-
-exp2con(X-Y, XF, XCF, VX-VY) :- !,
-	exp2con(X, XF, XCF, VX), exp2con(Y, XF, XCF, VY).
-
-exp2con(X=Y, XF, XCF, VX=VY) :- !,
-	exp2con(X, XF, XCF, VX), exp2con(Y, XF, XCF, VY).
-
-exp2con(X=<Y, XF, XCF, VX=<VY) :- !,
-	exp2con(X, XF, XCF, VX), exp2con(Y, XF, XCF, VY).
-
-exp2con(X<Y, XF, XCF, VX<VY) :- !,
-	exp2con(X, XF, XCF, VX), exp2con(Y, XF, XCF, VY).
-
-exp2con(X>=Y, XF, XCF, VY=<VX) :- !,
-	exp2con(X, XF, XCF, VX), exp2con(Y, XF, XCF, VY).
+paths([], [], []).
+paths([V|Vs], [L|Ls], [R|Rs]) :-
+	path(V, R, L, _),
+	paths(Vs, Ls, Rs).
 	
-exp2con(X>Y, XF, XCF, VY<VX) :- !,
-	exp2con(X, XF, XCF, VX), exp2con(Y, XF, XCF, VY).
+exp2cons([], _, []).
+exp2cons([E|Es], Vars, [O|Os]) :-
+	exp2con(E, Vars, O),
+	exp2cons(Es, Vars, Os).
 
-exp2con(X, _, _, X) :-
+exp2con(N*X, Vars, N*VX) :- !,
+	number(N), exp2con(X, Vars, VX).
+
+exp2con(X*N, Vars, N*VX) :- !,
+	number(N), exp2con(X, Vars, VX).
+
+exp2con(X+Y, Vars, VX+VY) :- !,
+	exp2con(X, Vars, VX), exp2con(Y, Vars, VY).
+
+exp2con(X-Y, Vars, VX-VY) :- !,
+	exp2con(X, Vars, VX), exp2con(Y, Vars, VY).
+
+exp2con(X=Y, Vars, VX=VY) :- !,
+	exp2con(X, Vars, VX), exp2con(Y, Vars, VY).
+
+exp2con(X=<Y, Vars, VX=<VY) :- !,
+	exp2con(X, Vars, VX), exp2con(Y, Vars, VY).
+
+exp2con(X<Y, Vars, VX<VY) :- !,
+	exp2con(X, Vars, VX), exp2con(Y, Vars, VY).
+
+exp2con(X>=Y, Vars, VY=<VX) :- !,
+	exp2con(X, Vars, VX), exp2con(Y, Vars, VY).
+	
+exp2con(X>Y, Vars, VY<VX) :- !,
+	exp2con(X, Vars, VX), exp2con(Y, Vars, VY).
+
+exp2con(X, _, X) :-
 	number(X), !.
 
-exp2con(X, XF, XCF, VX) :-
+exp2con(X, Vars, VX) :-
 	ground(X), 
-    atom_length(X, L),
-    L2 is L-2,
-   (sub_atom(X, L2, 2, 0, 'CF') -> 
-		sub_atom(X, 0, L2, _, X2), feature(P, X2), nth0(P, XCF, VX);
-		feature(P, X), nth0(P, XF, VX) ).
-
+	term_string(X, S), 
+	sub_string(S, Before, _, After, "_"),
+	sub_atom(S, 0, Before, _, I),
+	sub_atom(S, _, After, 0, V),
+	instance(N, I),
+	nth0(N, Vars, INST),
+	feature(P, V),
+	nth0(P, INST, VX).
 
 %%%%%%% basic operations on linear systems
 %  satisfiable, entails, equivalent
@@ -77,7 +84,17 @@ tell_cs([C|Cs]) :-
 	{C}, 
 	tell_cs(Cs).
 	
+tells_cs([]).
+tells_cs([C|Cs]) :-  
+	tell_cs(C),
+	tells_cs(Cs).
+	
 %%%%%%% utilities
+
+lengths([], _).
+lengths([V|Vs], N) :-
+	length(V, N),
+	lengths(Vs, N).
 
 cls :- write('\33\[2J').
 
