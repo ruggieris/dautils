@@ -23,14 +23,14 @@ class Model2CLP:
         self.feature_names = df_code.encoded_atts(pred_atts)
         self.constraints = []
         self.instances = dict()
-        self.model = ""
+        self.model_ = ""
         self.transform = self.Parse(self)
         self.parse = lark.Lark(self.grammar_exp, parser='lalr', transformer=self.transform).parse
 
     def reset(self):
         self.constraints = []
         self.instances = dict()
-        self.model = ""
+        self.model_ = ""
     
     grammar_exp = """
         ?start: seqc
@@ -181,7 +181,7 @@ class Model2CLP:
         for name, (n, _) in self.instances.items():
             o.write("\ninstance({}, i{}).".format(n, name))
         # model
-        o.write(self.model)
+        o.write(self.model_)
         # test clause
         Cs = ", ".join(c for c in self.constraints)
         Labs = ", ".join(str(label) for _, (_, label) in self.instances.items())
@@ -201,7 +201,7 @@ class Model2CLP:
         n = len(self.instances)
         self.instances[name] = (n, label)        
         
-    def model_tree(self, tree):
+    def model(self, tree):
         tree_ = tree.tree_
         classes_ = tree.classes_
         feature_pos = {f:i for i, f in enumerate(self.feature_names)}
@@ -210,7 +210,7 @@ class Model2CLP:
             for i in tree_.feature
         ]
         nf = len(self.feature_names)
-        res = "% path(Vars, Constraint, Pred, Conf) :- Constraint in a path of a decision tree over Vars with prediction Pred and confidence Conf"
+        res = "\n% path(Vars, Constraint, Pred, Conf) :- Constraint in a path of a decision tree over Vars with prediction Pred and confidence Conf"
         def recurse(node, depth, body="", varset=set()):
             if tree_.feature[node] != _tree.TREE_UNDEFINED:
                 var = feature_name[node]
@@ -230,7 +230,7 @@ class Model2CLP:
                 maxfreq /= sum(freqs)
                 allf = ','.join( ('X'+str(i) if i in varset else '_') for i in range(nf) )
                 return "path([{}], [{}], {}, {}).".format(allf, body, classes_[pred], maxfreq)
-        self.model = res + "\n" + recurse(0, 1)
+        self.model_ = res + "\n" + recurse(0, 1)
     
     def constraint(self, con):
         # linear expression on continuous/ordinal features
