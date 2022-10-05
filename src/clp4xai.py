@@ -101,18 +101,22 @@ class Model2CLP:
            
         def eq(self, left, right):
             if left[0]=='var' and right[0]=='val':
+                # inst.var = val
                 var, val = left[2], right[1]
                 if self.m2 is not None and var in self.m2.df_code.nominal and val not in self.m2.df_code.encode[var]:
                     raise ValueError("value not in domain " + val)
                 left[2] += '_'+val
                 return ['=', left, ['number_const', '1']]
             if left[0]=='var' and right[0]=='var':
+                # inst1.var1 = inst2.var2
                 inst1, inst2 = left[1], right[1]
                 var1, var2 = left[2], right[2]
                 if self.m2 is not None:
                     var1n, var2n = var1 in self.m2.df_code.nominal, var2 in self.m2.df_code.nominal
                     if var1n or var2n:
+                        # at least one var1 or var2 nominal
                         if var1n and var2n:
+                            # var1 and var2 nominal
                             d1 = set(self.m2.df_code.encode[var1].keys())
                             d2 = set(self.m2.df_code.encode[var2].keys())
                             if d1 != d2:
@@ -122,6 +126,7 @@ class Model2CLP:
                                 con = ["=", ['var', inst1, var1+'_'+v], ['var', inst2, var2+'_'+v]]
                                 res = [',', con, res] if res != [] else con
                             return res
+                        # one but not both var1 and var2 nominal
                         raise ValueError("equality between different types "+var1+" "+var2)                    
             return ['=', left, right]
            
@@ -132,7 +137,9 @@ class Model2CLP:
             return ['<', right, left]
            
         def iff(self, left, right):
-            # check types
+            # inst1.var1 = val1 <=> inst2.var2 = val2 
+            # arrives already transformed by eq() as
+            # inst1.var1_val1 = 1 <=> inst2.var2_val2 = 1
             assert left[0]=='=' and right[0]=='='
             assert left[1][0]=='var' and right[1][0]=='var'
             assert left[2][0]=='number_const' and right[2][0]=='number_const'
