@@ -165,7 +165,6 @@ class Model2CLP:
             if op=='-' and len(tree)==2:
                 return -self.toCLP(tree[1])
             raise "unknown operator"
-
             
     
     def toCLP(self, o=sys.stdout):
