@@ -35,19 +35,14 @@ exp2con(X>=Y, Vars, VY=<VX) :- !,
 exp2con(X>Y, Vars, VY<VX) :- !,
 	exp2con(X, Vars, VX), exp2con(Y, Vars, VY).
 
-exp2con(X, _, X) :-
-	number(X), !.
-
-exp2con(X, Vars, VX) :-
-	ground(X), 
-	term_string(X, S), 
-	sub_string(S, Before, _, After, "_"),
-	sub_atom(S, 0, Before, _, I),
-	sub_atom(S, _, After, 0, V),
+exp2con(var(I, V), Vars, VX) :- !,
 	instance(N, I),
 	nth0(N, Vars, INST),
 	feature(P, V),
 	nth0(P, INST, VX).
+
+exp2con(X, _, X) :-
+	number(X), !.
 
 %%%%%%% basic operations on linear systems
 %  satisfiable, entails, equivalent

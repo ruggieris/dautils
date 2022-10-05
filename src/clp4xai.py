@@ -24,7 +24,7 @@ class Model2CLP:
         self.constraints = []
         self.instances = dict()
         self.model = ""
-        self.transform = self.Parse()
+        self.transform = self.Parse(self)
         self.parse = lark.Lark(self.grammar_exp, parser='lalr', transformer=self.transform).parse
 
     def reset(self):
@@ -33,7 +33,9 @@ class Model2CLP:
         self.model = ""
     
     grammar_exp = """
-        ?start: cons
+        ?start: seqc
+        ?seqc: cons
+            | seqc "," cons       -> seq
         ?cons: exp "<" exp        -> lt
             | exp "<=" exp        -> le
             | exp "=" exp         -> eq
@@ -58,7 +60,9 @@ class Model2CLP:
     """       
 
     class Parse(lark.InlineTransformer):
-        number = float
+        
+        def __init__(self, m2=None):
+            self.m2 = m2
     
         def number(self, value):
             return ['number_const', str(float(value))]
@@ -67,6 +71,11 @@ class Model2CLP:
             return ['val', value]
     
         def var(self, inst, var):
+            if self.m2 is not None:
+                if inst not in self.m2.instances:
+                    raise ValueError("unknown instance "+inst)
+                if var not in self.m2.pred_atts:
+                    raise ValueError("unknown var "+var)
             return ['var', inst, var]
         
         def add(self, left, right):
@@ -92,8 +101,28 @@ class Model2CLP:
            
         def eq(self, left, right):
             if left[0]=='var' and right[0]=='val':
-                left[2] += '_'+right[1]
+                var, val = left[2], right[1]
+                if self.m2 is not None and var in self.m2.df_code.nominal and val not in self.m2.df_code.encode[var]:
+                    raise ValueError("value not in domain " + val)
+                left[2] += '_'+val
                 return ['=', left, ['number_const', '1']]
+            if left[0]=='var' and right[0]=='var':
+                inst1, inst2 = left[1], right[1]
+                var1, var2 = left[2], right[2]
+                if self.m2 is not None:
+                    var1n, var2n = var1 in self.m2.df_code.nominal, var2 in self.m2.df_code.nominal
+                    if var1n or var2n:
+                        if var1n and var2n:
+                            d1 = set(self.m2.df_code.encode[var1].keys())
+                            d2 = set(self.m2.df_code.encode[var2].keys())
+                            if d1 != d2:
+                                raise ValueError("equality between different domains "+var1+" "+var2)
+                            res = []
+                            for v in d1:
+                                con = ["=", ['var', inst1, var1+'_'+v], ['var', inst2, var2+'_'+v]]
+                                res = [',', con, res] if res != [] else con
+                            return res
+                        raise ValueError("equality between different types "+var1+" "+var2)                    
             return ['=', left, right]
            
         def ge(self, left, right):
@@ -111,6 +140,9 @@ class Model2CLP:
             right1 = ['var', right[1][1], right[1][2]] 
             return ['=', left1, right1]
                 
+        def seq(self, left, right):
+            return [',', left, right]
+
         def toCLP(self, tree):
             op = tree[0]
             if op=='number_const':
@@ -119,7 +151,7 @@ class Model2CLP:
                 return tree[1]
             if op=='var':
                 return 'var(i'+tree[1]+', v'+tree[2]+')'
-            if op in {'+', '*', '/', '=<', '<', '='}:
+            if op in {'+', '*', '/', '=<', '<', '=', ','}:
                 return self.toCLP(tree[1]) + op + self.toCLP(tree[2])
             if op=='-' and len(tree)==3:
                 return self.toCLP(tree[1]) + '-' + self.toCLP(tree[2])
@@ -141,7 +173,7 @@ class Model2CLP:
         o.write('\nnfeatures({}).'.format(nf))
         # instances
         for name, (n, _) in self.instances.items():
-            o.write("\ninstance(i{}, {}).".format(n, name))
+            o.write("\ninstance({}, i{}).".format(n, name))
         # model
         o.write(self.model)
         # test clause
@@ -163,7 +195,7 @@ class Model2CLP:
         n = len(self.instances)
         self.instances[name] = (n, label)        
         
-    def model2CLP(self, tree):
+    def model_tree(self, tree):
         tree_ = tree.tree_
         classes_ = tree.classes_
         feature_pos = {f:i for i, f in enumerate(self.feature_names)}
