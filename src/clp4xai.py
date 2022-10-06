@@ -18,7 +18,6 @@ from lineartree import LinearTreeClassifier
 # local packages
 import dautils
 
-
 class Model2CLP:
     def __init__(self, pred_atts, target, df_code):
         self.pred_atts = pred_atts
@@ -168,8 +167,7 @@ class Model2CLP:
                 return self.toCLP(tree[1]) + '-' + self.toCLP(tree[2])
             if op=='-' and len(tree)==2:
                 return -self.toCLP(tree[1])
-            raise ValueError("unknown operator"+op)
-            
+            raise ValueError("unknown operator"+op)        
     
     def toCLP(self, o=sys.stdout):
         # header
@@ -239,6 +237,8 @@ class Model2CLP:
             return
         if isinstance(clf, LinearTreeClassifier):
             tree_ = clf.summary()
+            if len(clf.classes_) != 2:
+                raise ValueError("only binary model trees are admissible so far")
             def recurse(n, body="", varset=set(), round_coef=round_coef):
                 node = tree_[n]
                 if 'col' in node:
@@ -259,7 +259,7 @@ class Model2CLP:
                     threshold = round(float(node['models'].intercept_[0]), round_coef)
                     varset = varset | set([i for i, v in enumerate(coef) if v != 0])
                     allf = ','.join( ('X'+str(i) if i in varset else '_') for i in range(nf) )
-                    maxfreq = 1
+                    maxfreq = 1 # TBD confidence to be calculated
                     # left
                     name = '+'.join(str(v)+'*X'+str(i) for i, v in enumerate(coef) if v != 0)
                     if body != '':
