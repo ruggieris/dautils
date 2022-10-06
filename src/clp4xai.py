@@ -131,10 +131,10 @@ class Model2CLP:
             return ['=', left, right]
            
         def ge(self, left, right):
-            return ['=<', right, left]
+            return ['=>', left, right]
            
         def gt(self, left, right):
-            return ['<', right, left]
+            return ['>', left, right]
            
         def iff(self, left, right):
             # inst1.var1 = val1 <=> inst2.var2 = val2 
