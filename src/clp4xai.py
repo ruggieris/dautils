@@ -211,7 +211,7 @@ class Model2CLP:
         ]
         nf = len(self.feature_names)
         res = "\n% path(Vars, Constraint, Pred, Conf) :- Constraint in a path of a decision tree over Vars with prediction Pred and confidence Conf"
-        def recurse(node, depth, body="", varset=set()):
+        def recurse(node, body="", varset=set()):
             if tree_.feature[node] != _tree.TREE_UNDEFINED:
                 var = feature_name[node]
                 name = 'X' + str(var)
@@ -220,9 +220,9 @@ class Model2CLP:
                     body = body + ','
                 body_left = body + "{} =< {}".format(name, threshold)
                 varset = varset | set([var])
-                res_left = recurse(tree_.children_left[node], depth + 1, body_left, varset)
+                res_left = recurse(tree_.children_left[node], body_left, varset)
                 body_right = body + "{} > {}".format(name, threshold)
-                res_right = recurse(tree_.children_right[node], depth + 1, body_right, varset)
+                res_right = recurse(tree_.children_right[node], body_right, varset)
                 return res_left + "\n" + res_right
             else:
                 freqs = tree_.value[node][0]
@@ -230,7 +230,7 @@ class Model2CLP:
                 maxfreq /= sum(freqs)
                 allf = ','.join( ('X'+str(i) if i in varset else '_') for i in range(nf) )
                 return "path([{}], [{}], {}, {}).".format(allf, body, classes_[pred], maxfreq)
-        self.model_ = res + "\n" + recurse(0, 1)
+        self.model_ = res + "\n" + recurse(0)
     
     def constraint(self, con):
         # linear expression on continuous/ordinal features
