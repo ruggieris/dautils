@@ -6,10 +6,14 @@ Created on Tue Oct  4 15:06:44 2022
 
 # standard packages
 from sklearn.tree import _tree
+from sklearn.tree import DecisionTreeClassifier
+
 import sys
 
 # pip install lark-parser
 import lark
+# pip install lineartree
+from lineartree import LinearTreeClassifier
 
 # local packages
 import dautils
@@ -158,13 +162,13 @@ class Model2CLP:
                 return tree[1]
             if op=='var':
                 return 'var(i'+tree[1]+', v'+tree[2]+')'
-            if op in {'+', '*', '/', '=<', '<', '=', ','}:
+            if op in {'+', '*', '/', '=<', '<', '=', ',', '=>'}:
                 return self.toCLP(tree[1]) + op + self.toCLP(tree[2])
             if op=='-' and len(tree)==3:
                 return self.toCLP(tree[1]) + '-' + self.toCLP(tree[2])
             if op=='-' and len(tree)==2:
                 return -self.toCLP(tree[1])
-            raise "unknown operator"
+            raise ValueError("unknown operator"+op)
             
     
     def toCLP(self, o=sys.stdout):
@@ -201,39 +205,75 @@ class Model2CLP:
         n = len(self.instances)
         self.instances[name] = (n, label)        
         
-    def model(self, tree):
-        tree_ = tree.tree_
-        classes_ = tree.classes_
-        feature_pos = {f:i for i, f in enumerate(self.feature_names)}
-        feature_name = [
-            feature_pos[self.feature_names[i]] if i != _tree.TREE_UNDEFINED else "undefined!"
-            for i in tree_.feature
-        ]
+    def model(self, clf, round_coef=2):
         nf = len(self.feature_names)
         res = "\n% path(Vars, Constraint, Pred, Conf) :- Constraint in a path of a decision tree over Vars with prediction Pred and confidence Conf"
-        def recurse(node, body="", varset=set()):
-            if tree_.feature[node] != _tree.TREE_UNDEFINED:
-                var = feature_name[node]
-                name = 'X' + str(var)
-                threshold = tree_.threshold[node]
-                if body != '':
-                    body = body + ','
-                body_left = body + "{} =< {}".format(name, threshold)
-                varset = varset | set([var])
-                res_left = recurse(tree_.children_left[node], body_left, varset)
-                body_right = body + "{} > {}".format(name, threshold)
-                res_right = recurse(tree_.children_right[node], body_right, varset)
-                return res_left + "\n" + res_right
-            else:
-                freqs = tree_.value[node][0]
-                pred, maxfreq = dautils.argmax(freqs)
-                maxfreq /= sum(freqs)
-                allf = ','.join( ('X'+str(i) if i in varset else '_') for i in range(nf) )
-                return "path([{}], [{}], {}, {}).".format(allf, body, classes_[pred], maxfreq)
-        self.model_ = res + "\n" + recurse(0)
+        if isinstance(clf, DecisionTreeClassifier):
+            tree_ = clf.tree_
+            classes_ = clf.classes_
+            feature_pos = {f:i for i, f in enumerate(self.feature_names)}
+            feature_name = [
+                feature_pos[self.feature_names[i]] if i != _tree.TREE_UNDEFINED else "undefined!"
+                for i in tree_.feature
+            ]
+            def recurse(node, body="", varset=set()):
+                if tree_.feature[node] != _tree.TREE_UNDEFINED:
+                    var = feature_name[node]
+                    name = 'X' + str(var)
+                    threshold = tree_.threshold[node]
+                    if body != '':
+                        body = body + ','
+                    body_left = body + "{} =< {}".format(name, threshold)
+                    varset = varset | set([var])
+                    res_left = recurse(tree_.children_left[node], body_left, varset)
+                    body_right = body + "{} > {}".format(name, threshold)
+                    res_right = recurse(tree_.children_right[node], body_right, varset)
+                    return res_left + "\n" + res_right
+                else:
+                    freqs = tree_.value[node][0]
+                    pred, maxfreq = dautils.argmax(freqs)
+                    maxfreq /= sum(freqs)
+                    allf = ','.join( ('X'+str(i) if i in varset else '_') for i in range(nf) )
+                    return "path([{}], [{}], {}, {}).".format(allf, body, classes_[pred], maxfreq)
+            self.model_ = res + "\n" + recurse(0)
+            return
+        if isinstance(clf, LinearTreeClassifier):
+            tree_ = clf.summary()
+            def recurse(n, body="", varset=set(), round_coef=round_coef):
+                node = tree_[n]
+                if 'col' in node:
+                    var = node['col']
+                    name = 'X' + str(var)
+                    threshold = node['th']
+                    if body != '':
+                        body = body + ','
+                    body_left = body + "{} =< {}".format(name, threshold)
+                    varset = varset | set([var])
+                    res_left = recurse(node['children'][0], body_left, varset)
+                    body_right = body + "{} > {}".format(name, threshold)
+                    res_right = recurse(node['children'][1], body_right, varset)
+                    return res_left + "\n" + res_right
+                else:
+                    coef = node['models'].coef_[0]
+                    coef = [(round(v, round_coef) if abs(v)>=0.01 else 0) for v in coef]
+                    threshold = round(float(node['models'].intercept_[0]), round_coef)
+                    varset = varset | set([i for i, v in enumerate(coef) if v != 0])
+                    allf = ','.join( ('X'+str(i) if i in varset else '_') for i in range(nf) )
+                    maxfreq = 1
+                    # left
+                    name = '+'.join(str(v)+'*X'+str(i) for i, v in enumerate(coef) if v != 0)
+                    if body != '':
+                        body = body + ','
+                    body_left = body + "{} =< {}".format(name, threshold)
+                    body_right = body + "{} > {}".format(name, threshold)
+                    left = "path([{}], [{}], {}, {}).".format(allf, body_left, node['classes'][0], maxfreq)
+                    right = "path([{}], [{}], {}, {}).".format(allf, body_right, node['classes'][1], maxfreq)
+                    return left + "\n" + right
+            self.model_ = res + "\n" + recurse(0)
+            return
+        raise ValueError("unknown model " + str(clf))
     
     def constraint(self, con):
         # linear expression on continuous/ordinal features
-        self.constraints.append(self.transform.toCLP(self.parse(con)))
-        
+        self.constraints.append(self.transform.toCLP(self.parse(con)))        
         
