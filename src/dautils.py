@@ -136,10 +136,14 @@ class Encode:
         atts = self.nominal | self.ordinal
         atts &= cols # only atts in df
         atts -= self.encode.keys() # not already encoded
-        for col in atts:
-            uniq = sorted([v for v in df[col].unique() if pd.notna(v)])
-            self.encode[col] = { v:i for i, v in enumerate(uniq) }
-        self.decode = { c:{i:v for v, i in self.encode[c].items()} for c in self.encode}
+        cols -= self.encode.keys() # not already encoded
+        for col in cols:
+            if col in atts:
+                uniq = sorted([v for v in df[col].unique() if pd.notna(v)])
+                self.encode[col] = { v:i for i, v in enumerate(uniq) }
+            else: # continuous
+                self.encode[col] = (df[col].min(), df[col].max())
+        self.decode = { c:{i:v for v, i in self.encode[c].items()} for c in self.encode if not isinstance(self.encode[c], tuple)}
         return self.transform(df)
     
     def transform(self, df):

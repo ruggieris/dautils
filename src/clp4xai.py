@@ -186,7 +186,12 @@ class Model2CLP:
         o.write(self.model_)
         # test clause
         Cs = ", ".join(c for c in self.constraints)
+        for name in self.instances.keys():
+            Cs += ", ".join("var(i{}, v{}) =< {}, var(i{}, v{}) => {}".format(name, c, minmax[1], name, c, minmax[0]) for c, minmax in self.df_code.encode.items() if isinstance(self.df_code.encode[c], tuple))
         Labs = ", ".join(str(label) for _, (_, label) in self.instances.items())
+        #if self.optimize: # behavior can change based on active options
+        #    o.write('')
+        #else:
         o.write("""\ntest(Vars) :- 
             nfeatures(N), 
             length(Vars, {}),
