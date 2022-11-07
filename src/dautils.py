@@ -112,7 +112,8 @@ class Encode:
         Parameters:
         nominal (iterable): nominal attributes to encode or None for all attributes
         ordinal (iterable): ordinal attributes to encode
-        decode (dictionary): pre-set encodings to extend        
+        decode (dictionary): pre-set encodings to extend  
+        onehot: use one-hot-encoding for nominal (if False, map values to integers)
         """
         self.nominal = set(nominal)
         self.ordinal = set(ordinal)
@@ -135,8 +136,9 @@ class Encode:
         cols = set(df.columns)
         atts = self.nominal | self.ordinal
         atts &= cols # only atts in df
-        atts -= self.encode.keys() # not already encoded
-        cols -= self.encode.keys() # not already encoded
+        encoded = self.encode.keys()
+        atts -= encoded # not already encoded
+        cols -= encoded # not already encoded
         for col in cols:
             if col in atts:
                 uniq = sorted([v for v in df[col].unique() if pd.notna(v)])
